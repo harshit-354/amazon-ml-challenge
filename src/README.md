@@ -31,13 +31,14 @@ Run it from the repository root with the challenge TSV paths:
 
 ```bash
 python -m src.blocking \
-  --source1 src/dataset/student_resource/dataset/train/train_source1.tsv \
-  --source2 src/dataset/student_resource/dataset/train/train_source2.tsv \
-  --source3 src/dataset/student_resource/dataset/train/train_source3.tsv \
+  --source1 dataset/student_resource/dataset/train/train_source1.tsv \
+  --source2 dataset/student_resource/dataset/train/train_source2.tsv \
+  --source3 dataset/student_resource/dataset/train/train_source3.tsv \
   --output output/train_candidate_pairs.tsv
 ```
 
-Use the corresponding `test/test_source*.tsv` paths to create test candidates.
+Use the corresponding `dataset/student_resource/dataset/test/test_source*.tsv`
+paths to create test candidates.
 Thresholds and the per-method candidate cap can be adjusted with
 `--token-threshold`, `--char-threshold`, and `--max-per-method`. The defaults
 are starting points; tune them on a held-out training split by measuring

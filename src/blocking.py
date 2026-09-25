@@ -36,7 +36,7 @@ def _char_ngrams(value: object, n: int = 3) -> set[str]:
     return {padded[i : i + n] for i in range(len(padded) - n + 1)}
 
 
-def _prepare_frame(frame: pd.DataFrame) -> pd.DataFrame:
+def _prepare_frame(frame: pd.DataFrame, source_label: str) -> pd.DataFrame:
     """Ensure the normalized fields needed for blocking exist."""
     required = {"entity_id", "business_name", "business_address"}
     missing = required.difference(frame.columns)
@@ -44,8 +44,15 @@ def _prepare_frame(frame: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"Source frame is missing required columns: {sorted(missing)}")
 
     if {"norm_name", "norm_address"}.issubset(frame.columns):
+        print(f"[blocking] {source_label}: normalized columns already present; skipping normalization", flush=True)
         return frame
-    return normalize_dataframe(frame)
+    print(f"[blocking] {source_label}: starting normalization ({len(frame):,} rows)", flush=True)
+    try:
+        result = normalize_dataframe(frame, verbose=True)
+    except Exception as exc:
+        raise RuntimeError(f"Normalization failed for {source_label}: {exc}") from exc
+    print(f"[blocking] {source_label}: normalization complete", flush=True)
+    return result
 
 
 def _build_index(records: Sequence[set[str]]) -> dict[str, list[int]]:
@@ -111,21 +118,24 @@ def generate_candidate_pairs(
     if min_shared_tokens < 1 or max_candidates_per_method < 1 or char_ngram_size < 1:
         raise ValueError("min_shared_tokens, max_candidates_per_method and char_ngram_size must be positive")
 
-    s1 = _prepare_frame(source1).reset_index(drop=True)
-    s2 = _prepare_frame(source2).reset_index(drop=True)
-    s3 = _prepare_frame(source3).reset_index(drop=True)
+    s1 = _prepare_frame(source1, "Source 1").reset_index(drop=True)
+    s2 = _prepare_frame(source2, "Source 2").reset_index(drop=True)
+    s3 = _prepare_frame(source3, "Source 3").reset_index(drop=True)
     targets = pd.concat([s2, s3], ignore_index=True)
 
+    print(f"[blocking] Building token and character indexes for {len(targets):,} target records", flush=True)
     name_tokens = [_tokens(value) for value in targets["norm_name"]]
     address_tokens = [_tokens(value) for value in targets["norm_address"]]
     name_grams = [_char_ngrams(value, char_ngram_size) for value in targets["norm_name"]]
     name_index = _build_index(name_tokens)
     address_index = _build_index(address_tokens)
     char_index = _build_index(name_grams)
+    print("[blocking] Indexes ready; generating candidates", flush=True)
 
     target_ids = targets["entity_id"].astype(str).tolist()
     rows: list[dict[str, str]] = []
-    for _, record in s1.iterrows():
+    total_source1 = len(s1)
+    for row_number, (_, record) in enumerate(s1.iterrows(), start=1):
         candidate_rows: set[int] = set()
         query_name = _tokens(record["norm_name"])
         query_address = _tokens(record["norm_address"])
@@ -156,6 +166,8 @@ def generate_candidate_pairs(
             "source1_entity_id": str(record["entity_id"]),
             "candidate_entity_ids": ",".join(candidate_ids),
         })
+        if row_number % 10000 == 0 or row_number == total_source1:
+            print(f"[blocking] Candidate generation: {row_number:,}/{total_source1:,} Source 1 records", flush=True)
 
     return pd.DataFrame(rows, columns=["source1_entity_id", "candidate_entity_ids"])
 
@@ -168,13 +180,21 @@ def generate_from_tsv(
     **kwargs: object,
 ) -> pd.DataFrame:
     """Read three challenge TSVs, generate candidates and write the TSV output."""
+    print(f"[blocking] Reading Source 1: {source1_path}", flush=True)
     source1 = pd.read_csv(source1_path, sep="\t", dtype=str, keep_default_na=False)
+    print(f"[blocking] Read {len(source1):,} Source 1 records", flush=True)
+    print(f"[blocking] Reading Source 2: {source2_path}", flush=True)
     source2 = pd.read_csv(source2_path, sep="\t", dtype=str, keep_default_na=False)
+    print(f"[blocking] Read {len(source2):,} Source 2 records", flush=True)
+    print(f"[blocking] Reading Source 3: {source3_path}", flush=True)
     source3 = pd.read_csv(source3_path, sep="\t", dtype=str, keep_default_na=False)
+    print(f"[blocking] Read {len(source3):,} Source 3 records", flush=True)
     candidates = generate_candidate_pairs(source1, source2, source3, **kwargs)
     output_dir = os.path.dirname(os.path.abspath(output_path))
     os.makedirs(output_dir, exist_ok=True)
+    print(f"[blocking] Writing {len(candidates):,} rows to {output_path}", flush=True)
     candidates.to_csv(output_path, sep="\t", index=False, encoding="utf-8")
+    print("[blocking] Output write complete", flush=True)
     return candidates
 
 

@@ -270,6 +270,7 @@ def normalize_dataframe(
     norm_name_col: str = 'norm_name',
     norm_addr_col: str = 'norm_address',
     inplace: bool = False,
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """
     Efficiently normalize a pandas DataFrame of business entities.
@@ -278,15 +279,39 @@ def normalize_dataframe(
     if not inplace:
         df = df.copy()
 
-    # Fast list comprehension normalization
+    def normalize_values(values, normalizer, field_name):
+        results = []
+        total = len(values)
+        if verbose:
+            print(f"[normalize] {field_name}: starting {total:,} rows", flush=True)
+        for position, value in enumerate(values, start=1):
+            try:
+                results.append(normalizer(value))
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Failed to normalize {field_name} at dataframe row "
+                    f"position {position - 1} (value={value!r})"
+                ) from exc
+            if verbose and (position % 200000 == 0 or position == total):
+                print(f"[normalize] {field_name}: {position:,}/{total:,} rows", flush=True)
+        if verbose:
+            print(f"[normalize] {field_name}: complete", flush=True)
+        return results
+
+    # Process explicitly so long runs report progress and failures identify
+    # the field and row that caused them.
     raw_names = df[name_col].tolist() if name_col in df.columns else []
-    df[norm_name_col] = [normalize_name(n) for n in raw_names]
+    df[norm_name_col] = normalize_values(raw_names, normalize_name, name_col)
 
     raw_addrs = df[addr_col].tolist() if addr_col in df.columns else []
     if country_col and country_col in df.columns:
         countries = df[country_col].tolist()
-        df[norm_addr_col] = [normalize_address(a, c) for a, c in zip(raw_addrs, countries)]
+        df[norm_addr_col] = normalize_values(
+            list(zip(raw_addrs, countries)),
+            lambda pair: normalize_address(pair[0], pair[1]),
+            addr_col,
+        )
     else:
-        df[norm_addr_col] = [normalize_address(a) for a in raw_addrs]
+        df[norm_addr_col] = normalize_values(raw_addrs, normalize_address, addr_col)
 
     return df

@@ -1,0 +1,69 @@
+# =====================================================================
+# Amazon ML Challenge 2026 - Team .gitignore
+# =====================================================================
+
+# 1. Dataset & Student Resources (All teammates have student_resource locally)
+# TSV files are >500MB each and must not be pushed to GitHub
+student_resource/
+dataset/
+readme.md
+*.tsv
+*.csv
+*.parquet
+data/
+
+# 2. Output & Prediction artifacts (Leaderboard submissions & intermediate files)
+output/
+*.zip
+*.tar.gz
+
+# 3. Python cache & compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 4. Virtual Environments & Conda
+venv/
+.venv/
+env/
+ENV/
+conda-env/
+
+# 5. Jupyter Notebook checkpoints & scratchpads
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+scratch/
+
+# 6. Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 7. IDE & Editor configurations
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.antigravity/
+.gemini/
